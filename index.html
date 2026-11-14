@@ -110,6 +110,8 @@ select{padding:5px;border:1px solid var(--bd);border-radius:6px;background:var(-
 </div></div>
 <div class="card wrap"><table id="tbl"></table></div>
 <div class="row">
+<button class="b p" id="xl">Download Excel (all classes)</button>
+<button class="b" id="csvd">Download CSV (this class)</button>
 <button class="b" id="copy">Copy results as CSV</button>
 <button class="b" id="bk">Download backup</button>
 <label class="b" style="display:inline-block">Restore backup<input type="file" id="rs" accept=".json,application/json" style="display:none"></label>
@@ -118,6 +120,7 @@ select{padding:5px;border:1px solid var(--bd);border-radius:6px;background:var(-
 <p class="note">Activity medal: 4 gold · 3 silver · 2 green · 1 red. Overall (sum of six): 15 and above gold · 10 to 14 silver · 5 to 9 green · 1 to 4 red. Data is saved in this browser only, so download a backup now and then.</p>
 </main>
 <div id="pr"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const $=id=>document.getElementById(id);
 const ACTS=["Rims / Calligraphy","Solo Singing","Drawing / Colouring","Clay Modeling","Story Telling","Fancy Dress"];
@@ -198,6 +201,18 @@ $("copy").onclick=()=>{const c=C(),rows=[["Roll","Student","Section"].concat(ACT
  c.students.forEach(s=>rows.push([s.r||"",'"'+s.n.replace(/"/g,'""')+'"',s.sec||""].concat(s.s,[tot(s),om(tot(s))[0]]).join(",")));
  const d=ok=>$("msg").textContent=ok?"Copied. Paste into Excel or Sheets.":"Copy blocked by the browser.";
  try{navigator.clipboard.writeText(rows.join("\n")).then(()=>d(true),()=>d(false))}catch(e){d(false)}};
+const rowsFor=c=>{const l=sorted(c.students,"roll"),ts=l.map(tot).sort((a,b)=>b-a);return [["Roll","Student","Section"].concat(ACTS,["Total","Overall medal","Rank"])].concat(l.map(s=>[s.r||"",s.n,s.sec||""].concat(s.s,[tot(s),om(tot(s))[0],ts.indexOf(tot(s))+1])))};
+$("xl").onclick=()=>{
+ if(typeof XLSX=="undefined"){$("msg").textContent="Excel library could not load (check internet). Use Download CSV instead.";return}
+ try{const wb=XLSX.utils.book_new(),cl=cls(),used={Summary:1};
+ const sm=[["Atomic Energy Central School, Mysore - CCA Results "+db.year],[],["Class","Students","Gold","Silver","Green","Red"]];
+ cl.forEach(c=>{const k={g:0,s:0,n:0,r:0};c.students.forEach(s=>{const m=om(tot(s))[1];if(k[m]!=null)k[m]++});sm.push([c.name,c.students.length,k.g,k.s,k.n,k.r])});
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(sm),"Summary");
+ cl.forEach((c,i)=>{const ws=XLSX.utils.aoa_to_sheet(rowsFor(c));ws["!cols"]=[{wch:8},{wch:24},{wch:8}].concat(ACTS.map(()=>({wch:13})),[{wch:8},{wch:14},{wch:6}]);
+  let nm=(c.name.replace(/[^\w ()-]/g,"").trim().slice(0,28))||("Class "+(i+1));if(used[nm])nm=nm.slice(0,25)+" "+(i+1);used[nm]=1;XLSX.utils.book_append_sheet(wb,ws,nm)});
+ XLSX.writeFile(wb,"AECS-CCA-Results-"+db.year+".xlsx");$("msg").textContent="Excel file downloaded."}catch(e){$("msg").textContent="Excel download not possible here. Use Download CSV."}};
+$("csvd").onclick=()=>{try{const c=C(),t=rowsFor(c).map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")).join("\r\n");
+ const b=new Blob(["\ufeff"+t],{type:"text/csv"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="CCA-"+c.name+"-"+db.year+".csv";document.body.appendChild(a);a.click();a.remove();$("msg").textContent="CSV downloaded."}catch(e){$("msg").textContent="Download not possible here."}};
 $("bk").onclick=()=>{try{const b=new Blob([JSON.stringify(db)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="cca-backup-"+new Date().toISOString().slice(0,10)+".json";document.body.appendChild(a);a.click();a.remove();$("msg").textContent="Backup downloaded."}catch(e){$("msg").textContent="Download not possible here."}};
 $("rs").onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
  r.onload=()=>{try{const o=JSON.parse(r.result);if(!o.years||!o.year)throw 0;if(confirm("Replace ALL current data with this backup?")){db=o;cur=0;save();render();$("msg").textContent="Backup restored."}}catch(x){$("msg").textContent="That file is not a valid backup."}};
